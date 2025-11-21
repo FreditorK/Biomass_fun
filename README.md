@@ -1,8 +1,3 @@
-# Biomass_fun
-Here is the complete project specification, consolidated from all the screenshots into a single, structured, and copyable Markdown file. I have integrated the specific formulas and tables into their respective phases to ensure no information is lost.
-
------
-
 # Project Specification: Ecosystem Services Valuation using Sentinel-2 Data
 
 ## 1\. Materials & Environment
