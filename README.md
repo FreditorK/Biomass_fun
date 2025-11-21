@@ -367,3 +367,123 @@ $$Total\_ESV = \sum [Service\_i \times Area\_i \times Quality\_Factor\_i \times 
   * **Google Earth Engine:** [https://earthengine.google.com](https://earthengine.google.com)
   * **NASA Earthdata:** [https://earthdata.nasa.gov](https://earthdata.nasa.gov)
   * **FAO Forest Resources:** [http://www.fao.org/forestry](http://www.fao.org/forestry)
+
+
+## Data Information
+
+### 1\. What is inside Sentinel-2 Data?
+
+Sentinel-2 data comes from the European Space Agency (ESA) in a format called **SAFE**. When you unzip a Sentinel download, you get a folder ending in `.SAFE`.
+
+Here is the critical hierarchy inside that folder:
+
+  * **manifest.safe:** The XML file containing metadata (cloud cover percentage, acquisition time, etc.). You often need this to load the dataset in software like SNAP.
+  * **GRANULE folder:** This is where the actual images live.
+      * Inside `GRANULE`, you will see a long folder name (the Tile ID).
+      * Inside that, open `IMG_DATA`.
+  * **IMG\_DATA (The actual pixels):** This contains the spectral bands (usually in JPEG2000 `.jp2` format). They are separated by resolution:
+      * **R10m (10 meter resolution):** The sharpest bands.
+          * `B02` (Blue), `B03` (Green), `B04` (Red), `B08` (NIR).
+      * **R20m (20 meter resolution):**
+          * `B05`, `B06`, `B07` (Vegetation Red Edge), `B8A` (Narrow NIR), `B11`, `B12` (SWIR).
+      * **R60m (60 meter resolution):**
+          * `B01` (Coastal aerosol), `B09` (Water vapour), `B10` (Cirrus).
+
+
+
+Here is a comprehensive breakdown of your folder structure, followed by a structured Markdown file you can add to your project documentation.
+
+### The "Plain English" Explanation
+
+#### 1\. `data/ancillary/` (Your Helper Files)
+
+This is not a standard satellite folder; it is a folder for your own "auxiliary" data.
+
+  * **What belongs here:** The `circle_radius_25km.geojson` file you created earlier.
+  * **Purpose:** This contains the shapes (vectors) you will use to "cookie cut" (clip) the satellite images later.
+
+#### 2\. The `.SAFE` Folders (The Satellite Data)
+
+You have two massive folders starting with `S2C_MSIL2A...`. These are the raw downloads from the European Space Agency (ESA).
+
+  * **Why are there two?** Satellites take pictures in a grid. Your area of interest (the 25km circle) likely sits on the border between two grid squares (Tile 50RQV and Tile 51RTQ). You need both to see your whole circle.
+  * **What is "L2A"?** This stands for **Level-2A**. This is critical. It means the data has already been "Atmospherically Corrected." The hazy blue tint from the atmosphere has been removed. You are looking at the actual colors of the ground (Bottom-Of-Atmosphere Reflectance).
+
+#### 3\. `GRANULE/` (The Treasure Chest)
+
+Inside the `.SAFE` folder, the only subfolder that truly matters for analysis is `GRANULE`.
+
+  * **`IMG_DATA`**: This is where the actual pixels are.
+      * **`R10m`**: The high-resolution data (10 meters per pixel). This contains Blue, Green, Red, and Near-Infrared. This is what you use for standard visualization and NDVI (vegetation health).
+      * **`R20m`**: Medium resolution (20 meters). Contains "Red Edge" (for plant chlorophyll) and SWIR (Short Wave Infrared, for moisture/burn scars).
+      * **`R60m`**: Low resolution (60 meters). Used mostly for detecting clouds.
+
+-----
+
+### The Markdown Documentation
+
+Here is a clean, professional `DATA_README.md` file that explains your specific data structure. You can copy this directly into your project.
+
+# 🛰️ Data Directory Documentation
+
+This project utilizes Sentinel-2C satellite imagery (Level-2A) to analyze the Yangtze River Delta region.
+
+## 📂 Directory Tree Structure
+
+```text
+data/
+├── ancillary/ .......................... Vector files and Regions of Interest (ROI)
+│   └── circle_radius_25km.geojson ...... The target analysis area (AOI)
+│
+├── S2C_MSIL2A_..._T50RQV_...SAFE/ ...... Raw Tile 1 (Western part of AOI)
+│   └── GRANULE/
+│       └── L2A_.../
+│           ├── IMG_DATA/ ............... Actual image files (.jp2)
+│           │   ├── R10m/ ............... 10m Resolution (RGB + NIR)
+│           │   ├── R20m/ ............... 20m Resolution (Red Edge + SWIR)
+│           │   └── R60m/ ............... 60m Resolution (Atmospheric)
+│           └── QI_DATA/ ................ Cloud and Shadow masks
+│
+└── S2C_MSIL2A_..._T51RTQ_...SAFE/ ...... Raw Tile 2 (Eastern part of AOI)
+````
+
+## 🔍 Naming Convention Decoder
+
+The raw folder names contain metadata about the acquisition.
+Example: `S2C_MSIL2A_20251113T024511_N0511_R089_T50RQV...`
+
+| Segment | Value | Meaning |
+| :--- | :--- | :--- |
+| **Mission** | `S2C` | **Sentinel-2C** (Newest satellite unit) |
+| **Sensor** | `MSI` | MultiSpectral Instrument |
+| **Level** | `L2A` | **Level-2A** (Bottom of Atmosphere / Surface Reflectance) |
+| **Date** | `20251113` | Acquisition Date: **Nov 13, 2025** |
+| **Tile ID** | `T50RQV` | MGRS Grid Tile (Western tile) |
+| **Tile ID** | `T51RTQ` | MGRS Grid Tile (Eastern tile) |
+
+## 📸 Spectral Bands (Inside IMG\_DATA)
+
+When processing this data, use the appropriate resolution folder:
+
+### R10m (10 Meter Resolution)
+
+*High detail. Used for True Color (RGB) and Vegetation Indices (NDVI).*
+
+  * **B02:** Blue (490 nm)
+  * **B03:** Green (560 nm)
+  * **B04:** Red (665 nm)
+  * **B08:** Near Infrared (842 nm)
+
+### R20m (20 Meter Resolution)
+
+*Medium detail. Used for moisture detection and specialized vegetation analysis.*
+
+  * **B05, B06, B07:** Vegetation Red Edge
+  * **B8A:** Narrow Near Infrared
+  * **B11, B12:** SWIR (Short Wave Infrared)
+
+## ⚠️ Important Usage Notes
+
+1.  **Git Ignored:** The `.SAFE` folders are gigabytes in size. They are listed in `.gitignore` and are **not** pushed to GitHub.
+2.  **Mosaicking:** Because the AOI (25km circle) overlaps both `T50RQV` and `T51RTQ`, scripts must stitch these two tiles together before clipping to the circle geometry.
+3.  **Format:** Images are stored as JPEG 2000 (`.jp2`).
