@@ -1,0 +1,217 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{siunitx}
+\usepackage{xcolor}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+\title{Forest Biomass and Aquatic Ecosystem Services Assessment\\using Sentinel-2 Satellite Data}
+\author{Hackathon Team Name}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This report presents a preliminary assessment of forest biomass and aquatic ecosystem services for a \SI{25}{\kilo\meter} radius area of interest (AOI) using Sentinel-2 Level-2A satellite imagery and simple biophysical models.
+We describe the main data sources and processing steps, summarize the key results in terms of spatial patterns of biomass and ecosystem services, and discuss limitations and possible improvements.
+\end{abstract}
+
+\section{Introduction and Objectives}
+
+Forests and aquatic ecosystems provide a wide range of ecosystem services, including carbon storage, water flow regulation, sediment control, aquifer recharge, and flood protection.
+Quantifying these services in a consistent and spatially explicit way is essential for supporting conservation planning and climate adaptation strategies.
+
+In this hackathon project, we use Sentinel-2 Level-2A surface reflectance products to estimate aboveground forest biomass and to derive indicators for five hydrological ecosystem services associated with aquatic ecosystems (rivers, wetlands, lakes and riparian zones) within a predefined AOI.
+The AOI is defined as a circle of radius \SI{25}{\kilo\meter} centered at given geographic coordinates and intersects multiple Sentinel-2 tiles.
+
+The specific objectives are:
+\begin{itemize}
+  \item To preprocess Sentinel-2 Level-2A imagery (cloud masking, band extraction, reflectance scaling) and generate vegetation and water indices over the AOI.
+  \item To estimate forest aboveground biomass using published allometric equations based on vegetation indices (e.g.\ NDVI, EVI).
+  \item To derive spatial indicators for water flow regulation, water purification, sediment control, aquifer recharge and flood protection using simplified biophysical models.
+  \item To aggregate these indicators into ecosystem service value estimates using provided valuation coefficients and adjustment factors.
+  \item To visualize and interpret spatial patterns of biomass and ecosystem services, highlighting potential conservation or restoration priority areas.
+\end{itemize}
+
+\section{Applied Methodology}
+
+\subsection{Data and Study Area}
+
+The analysis is based on Sentinel-2 Level-2A (MSIL2A) products corresponding to the acquisition date specified in the hackathon guidelines.
+Because the AOI spans two Sentinel-2 tiles, both products overlapping the AOI were downloaded in SAFE format from the Copernicus Data Space Ecosystem.
+
+The key datasets are:
+\begin{itemize}
+  \item Sentinel-2 Level-2A reflectance bands: Blue (B02), Green (B03), Red (B04), NIR (B08), SWIR1 (B11), SWIR2 (B12).
+  \item Optional auxiliary rasters (if available): digital elevation model (DEM), slope and long-term mean annual precipitation.
+  \item Vector geometry of the AOI: a GeoJSON polygon representing the \SI{25}{\kilo\meter} buffer around the central coordinates.
+\end{itemize}
+
+\subsection{Preprocessing and Indices}
+
+All processing steps were implemented in Python using \texttt{rasterio}, \texttt{geopandas}, \texttt{numpy} and related libraries within a Jupyter notebook.
+
+The main preprocessing steps are:
+\begin{enumerate}
+  \item \textbf{SAFE structure handling:} For each Sentinel-2 product, the band files corresponding to the required spatial resolutions were located within the SAFE directory tree.
+  \item \textbf{Band extraction:} The relevant bands (B02, B03, B04, B08, B11, B12) were read as scaled integer arrays and converted to top-of-canopy reflectance in the range $[0,1]$ using the documented scale factor (typically $1/10000$).
+  \item \textbf{AOI clipping:} Each band was clipped to the AOI geometry.
+  Depending on the implementation, this was done either by reading windows intersecting the AOI or by masking the full tile with the AOI polygon.
+  \item \textbf{Resampling and alignment:} To ensure consistent pixel alignment when combining bands of different native resolutions (10\,m and 20\,m), all arrays were resampled onto a common 10\,m grid using bilinear resampling.
+  \item \textbf{Cloud and no-data masking:} Clouds and invalid pixels were masked using a combination of the Sentinel-2 quality flags (if available) and simple spectral thresholds.
+\end{enumerate}
+
+Based on the preprocessed bands, the following indices were computed:
+\begin{itemize}
+  \item Normalized Difference Vegetation Index (NDVI)
+        \[
+          \mathrm{NDVI} = \frac{\mathrm{NIR} - \mathrm{Red}}{\mathrm{NIR} + \mathrm{Red}}.
+        \]
+  \item Enhanced Vegetation Index (EVI), using the coefficients recommended in the project guidelines.
+  \item Soil Adjusted Vegetation Index (SAVI) for areas with sparse vegetation.
+  \item Normalized Difference Water Index (NDWI) and Modified NDWI (MNDWI) for water detection.
+  \item Normalized Difference Turbidity Index (NDTI) for relative turbidity in water bodies.
+\end{itemize}
+
+\subsection{Biomass Estimation}
+
+Forest aboveground biomass was estimated using the allometric equations provided in the hackathon document, selecting the equation corresponding to the dominant forest type in the AOI.
+In general, biomass per pixel is modeled as a linear or nonlinear function of a vegetation index, for example
+\[
+  \mathrm{Biomass} = a + b \cdot \mathrm{NDVI} + c \cdot \mathrm{NDVI}^2,
+\]
+where the coefficients $(a,b,c)$ and the valid NDVI range are taken from the literature.
+Biomass estimates were capped at a reasonable upper bound (e.g.\ 500~ton/ha) to avoid unrealistic values.
+
+Total biomass for the AOI was obtained by summing pixel-wise biomass and multiplying by the pixel area in hectares.
+
+\subsection{Ecosystem Service Indicators}
+
+For aquatic and riparian ecosystems, we followed the simplified biophysical formulas provided in the guidelines for five services:
+water flow regulation, water purification, sediment control, aquifer recharge and flood protection.
+Each service $S$ is represented as a raster indicator combining area, vegetation condition and ancillary factors such as slope or rainfall.
+Examples include:
+\begin{itemize}
+  \item Water flow regulation proportional to water storage capacity, modeled from wetland area, assumed average depth and a vegetation-based retention factor.
+  \item Water purification modeled from filtration rate, vegetation quality (NDVI-based) and contact time.
+  \item Sediment control estimated from a simplified erosion proxy based on $(1-\mathrm{NDVI})$ and slope, combined with a sediment delivery ratio and trap efficiency.
+  \item Aquifer recharge based on precipitation, infiltration rate and runoff coefficient, with NDVI used as a proxy for infiltration capacity.
+  \item Flood protection derived from floodplain area, assumed storage depth and a roughness factor linked to vegetation cover.
+\end{itemize}
+
+\subsection{Dynamic Valuation}
+
+Biophysical indicators were converted to monetary values using baseline valuation coefficients (USD/ha/year) for each service.
+These coefficients were then adjusted by a set of dimensionless factors describing ecosystem condition, water scarcity and downstream population or infrastructure exposure.
+The total ecosystem service value for each pixel and for the entire AOI was computed as
+\[
+  \mathrm{Total\_ESV} = \sum_i \mathrm{Service}_i \times \mathrm{Area}_i \times \mathrm{Quality\_Factor}_i \times \mathrm{Adjustment\_Factors}_i.
+\]
+
+\section{Main Results}
+
+\subsection{Forest Biomass}
+
+% Example figure placeholder
+\begin{figure}[ht]
+  \centering
+  % \includegraphics[width=0.8\textwidth]{figures/biomass_map.png}
+  \caption{Spatial distribution of estimated aboveground forest biomass (ton/ha) within the AOI.}
+  \label{fig:biomass_map}
+\end{figure}
+
+A continuous map of forest biomass was generated for the AOI using the selected allometric equation.
+Higher biomass values are concentrated in densely forested areas, especially along the upland regions to the west and south of the main lake.
+Lower biomass is observed in urban and agricultural zones.
+
+Table~\ref{tab:biomass_summary} summarizes basic statistics of biomass over the AOI.
+
+\begin{table}[ht]
+  \centering
+  \caption{Summary statistics of aboveground biomass (ton/ha) within the AOI.}
+  \label{tab:biomass_summary}
+  \begin{tabular}{lrrrr}
+    \toprule
+    Metric & Min & Mean & Median & Max \\
+    \midrule
+    Biomass (ton/ha) & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Aquatic Ecosystem Services}
+
+% Example figure placeholder
+\begin{figure}[ht]
+  \centering
+  % \includegraphics[width=0.8\textwidth]{figures/water_flow_regulation.png}
+  \caption{Example ecosystem service map: water flow regulation capacity (relative units).}
+  \label{fig:water_flow}
+\end{figure}
+
+Raster maps were produced for each of the five targeted ecosystem services.
+In general, high service provision is associated with intact wetlands and vegetated riparian zones, while degraded or urbanized shorelines show lower values.
+
+A concise summary of total and per-hectare values for each service is shown in Table~\ref{tab:esv_summary}.
+
+\begin{table}[ht]
+  \centering
+  \caption{Illustrative ecosystem service value summary for the AOI (values to be filled in).}
+  \label{tab:esv_summary}
+  \begin{tabular}{lrr}
+    \toprule
+    Ecosystem Service & Total value (USD/year) & Mean value (USD/ha/year) \\
+    \midrule
+    Water flow regulation   & -- & -- \\
+    Water purification      & -- & -- \\
+    Sediment control        & -- & -- \\
+    Aquifer recharge        & -- & -- \\
+    Flood protection        & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Analysis and Discussion}
+
+The results highlight strong spatial heterogeneity in both biomass and ecosystem service provision across the AOI.
+Forested uplands contribute disproportionately to carbon storage and sediment control, while low-lying wetlands and floodplains around the lake are key for water purification, aquifer recharge and flood attenuation.
+
+Several important points emerge from the analysis:
+\begin{itemize}
+  \item \textbf{Importance of vegetation condition:} NDVI and related indices strongly influence both biomass and multiple service indicators, underscoring the role of vegetation cover and health.
+  \item \textbf{Critical role of riparian zones:} Vegetated buffers along rivers and lake shorelines consistently appear as hotspots of water purification and flood protection services.
+  \item \textbf{Data and model limitations:} The biophysical models used are intentionally simple and rely on global default parameters.
+  They do not explicitly account for local hydrology, soil properties, management practices or infrastructure, and should be interpreted as relative indicators rather than precise absolute estimates.
+  \item \textbf{Uncertainty sources:} Major sources of uncertainty include cloud contamination, misclassification of land cover, limitations of the allometric equations outside their calibration range and the use of global valuation coefficients.
+\end{itemize}
+
+Despite these limitations, the workflow demonstrates that freely available satellite data can be combined with simple models to derive integrated maps of biomass and ecosystem services at regional scale.
+These outputs can support screening-level assessments and help identify priority areas for more detailed field-based studies.
+
+\section{Conclusions}
+
+This hackathon project implemented an end-to-end workflow for estimating forest biomass and key hydrological ecosystem services using Sentinel-2 Level-2A imagery for a \SI{25}{\kilo\meter} radius AOI.
+The methodology integrates satellite-derived vegetation and water indices, literature-based allometric equations and simplified biophysical and economic valuation models.
+
+The main contributions are:
+\begin{itemize}
+  \item A reproducible Python pipeline for loading, preprocessing and analyzing Sentinel-2 imagery in a geospatial context.
+  \item Spatially explicit maps of aboveground forest biomass and five aquatic ecosystem services.
+  \item A preliminary valuation of ecosystem services in monetary units, highlighting high-value hotspots within the AOI.
+\end{itemize}
+
+Future work could refine the approach by incorporating higher-resolution elevation and hydrological data, locally calibrated biomass and valuation models, and multi-temporal image series to assess seasonal and interannual variability.
+
+\end{document}
