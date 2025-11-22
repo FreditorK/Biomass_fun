@@ -1,3 +1,22 @@
 data/S2C_MSIL2A_20251113T024511_N0511_R089_T50RQV_20251113T054013.SAFE/
 data/S2C_MSIL2A_20251113T024511_N0511_R089_T51RTQ_20251113T054013.SAFE/
 
+# latex
+*.aux
+*.bbl
+*.blg
+*.brf
+*.idx
+*.ind
+*.lof
+*.log
+*.lot
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.nav
+*.snm
+*.vrb
+*.xdv
