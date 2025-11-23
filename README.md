@@ -424,11 +424,11 @@ Inside the `.SAFE` folder, the only subfolder that truly matters for analysis is
 
 Here is a clean, professional `DATA_README.md` file that explains your specific data structure. You can copy this directly into your project.
 
-# 🛰️ Data Directory Documentation
+# Data Directory Documentation
 
 This project utilizes Sentinel-2C satellite imagery (Level-2A) to analyze the Yangtze River Delta region.
 
-## 📂 Directory Tree Structure
+## Data Directory Tree Structure
 
 ```text
 data/
@@ -446,44 +446,3 @@ data/
 │
 └── S2C_MSIL2A_..._T51RTQ_...SAFE/ ...... Raw Tile 2 (Eastern part of AOI)
 ````
-
-## 🔍 Naming Convention Decoder
-
-The raw folder names contain metadata about the acquisition.
-Example: `S2C_MSIL2A_20251113T024511_N0511_R089_T50RQV...`
-
-| Segment | Value | Meaning |
-| :--- | :--- | :--- |
-| **Mission** | `S2C` | **Sentinel-2C** (Newest satellite unit) |
-| **Sensor** | `MSI` | MultiSpectral Instrument |
-| **Level** | `L2A` | **Level-2A** (Bottom of Atmosphere / Surface Reflectance) |
-| **Date** | `20251113` | Acquisition Date: **Nov 13, 2025** |
-| **Tile ID** | `T50RQV` | MGRS Grid Tile (Western tile) |
-| **Tile ID** | `T51RTQ` | MGRS Grid Tile (Eastern tile) |
-
-## 📸 Spectral Bands (Inside IMG\_DATA)
-
-When processing this data, use the appropriate resolution folder:
-
-### R10m (10 Meter Resolution)
-
-*High detail. Used for True Color (RGB) and Vegetation Indices (NDVI).*
-
-  * **B02:** Blue (490 nm)
-  * **B03:** Green (560 nm)
-  * **B04:** Red (665 nm)
-  * **B08:** Near Infrared (842 nm)
-
-### R20m (20 Meter Resolution)
-
-*Medium detail. Used for moisture detection and specialized vegetation analysis.*
-
-  * **B05, B06, B07:** Vegetation Red Edge
-  * **B8A:** Narrow Near Infrared
-  * **B11, B12:** SWIR (Short Wave Infrared)
-
-## ⚠️ Important Usage Notes
-
-1.  **Git Ignored:** The `.SAFE` folders are gigabytes in size. They are listed in `.gitignore` and are **not** pushed to GitHub.
-2.  **Mosaicking:** Because the AOI (25km circle) overlaps both `T50RQV` and `T51RTQ`, scripts must stitch these two tiles together before clipping to the circle geometry.
-3.  **Format:** Images are stored as JPEG 2000 (`.jp2`).
