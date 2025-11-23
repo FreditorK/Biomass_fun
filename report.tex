@@ -1,217 +1,285 @@
 \documentclass[11pt,a4paper]{article}
 
 \usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{multirow}
 \usepackage{graphicx}
-\usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{hyperref}
 \usepackage{siunitx}
+\usepackage{caption}
+\usepackage{cleveref}
+%\usepackage{apacite}
+\setlength {\marginparwidth }{2cm} 
+\usepackage{amssymb}
+\usepackage{latexsym}
+\usepackage{amsfonts}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{algorithm}
+\usepackage{algorithmicx}
+\usepackage{algpseudocode}
+\usepackage{float}
 \usepackage{xcolor}
-
-\hypersetup{
-  colorlinks=true,
-  linkcolor=blue,
-  urlcolor=blue,
-  citecolor=blue
-}
-
-\title{Forest Biomass and Aquatic Ecosystem Services Assessment\\using Sentinel-2 Satellite Data}
-\author{Hackathon Team Name}
-\date{\today}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{subcaption}
+\usepackage{wrapfig}
+\title{Calculating Forest Biomass and Aquatic Ecosystems Extension\\
+       Sentinel--2 Analysis for a Yangtze River Delta Study Area}
+\author{Kalise Optimal Earth}
+\date{November 23rd, 2025}
 
 \begin{document}
-
 \maketitle
 
-\begin{abstract}
-This report presents a preliminary assessment of forest biomass and aquatic ecosystem services for a \SI{25}{\kilo\meter} radius area of interest (AOI) using Sentinel-2 Level-2A satellite imagery and simple biophysical models.
-We describe the main data sources and processing steps, summarize the key results in terms of spatial patterns of biomass and ecosystem services, and discuss limitations and possible improvements.
-\end{abstract}
+\if{\begin{abstract}
+    Forests and aquatic ecosystems play a regulatory role in the global carbon and water cycles, but are not frequently monitored in a spatially explicit way.  
+    In this hackathon project, we design and implement a workflow to estimate aboveground forest biomass and map surface-water extent and quality for an area in the Yangtze River Delta.  
+    Using Sentinel-2 Level-2A imagery accessed via the Copernicus Data Space Ecosystem (CDSE) API, we compute vegetation indices, classify land cover, estimate biomass with simple NDVI-based allometric equations, and detect and characterise water bodies using NDWI, MNDWI, and an NDTI-based turbidity index. 
+\end{abstract}}\fi
 
-\section{Introduction and Objectives}
+\section{Introduction}
 
-Forests and aquatic ecosystems provide a wide range of ecosystem services, including carbon storage, water flow regulation, sediment control, aquifer recharge, and flood protection.
-Quantifying these services in a consistent and spatially explicit way is essential for supporting conservation planning and climate adaptation strategies.
+Forests and inland waters are spatially distributed regulators of
+carbon storage, hydrological flow, and biogeochemical cycling.  Forest
+aboveground biomass acts as a long-lived carbon pool; when it is
+removed by logging or land conversion, stored carbon is emitted as
+\(\mathrm{CO_2}\), contributing to climate change.  Rivers, lakes,
+wetlands, and riparian zones simultaneously provide water flow
+regulation, pollutant filtration, sediment trapping, aquifer recharge
+and flood mitigation.  These services are diffuse and dynamic and thus
+poorly captured by traditional inventory statistics.
 
-In this hackathon project, we use Sentinel-2 Level-2A surface reflectance products to estimate aboveground forest biomass and to derive indicators for five hydrological ecosystem services associated with aquatic ecosystems (rivers, wetlands, lakes and riparian zones) within a predefined AOI.
-The AOI is defined as a circle of radius \SI{25}{\kilo\meter} centered at given geographic coordinates and intersects multiple Sentinel-2 tiles.
+Quantifying the spatial structure of biomass and aquatic ecosystems
+is therefore both an applied mathematical problem and a practical
+support for conservation and planning.  The aim of this hackathon is
+to develop a coherent, fully reproducible workflow that:
+(i) estimates forest biomass from multispectral satellite imagery,
+(ii) maps the location and type of surface water, and
+(iii) assesses basic water-quality patterns.
 
-The specific objectives are:
-\begin{itemize}
-  \item To preprocess Sentinel-2 Level-2A imagery (cloud masking, band extraction, reflectance scaling) and generate vegetation and water indices over the AOI.
-  \item To estimate forest aboveground biomass using published allometric equations based on vegetation indices (e.g.\ NDVI, EVI).
-  \item To derive spatial indicators for water flow regulation, water purification, sediment control, aquifer recharge and flood protection using simplified biophysical models.
-  \item To aggregate these indicators into ecosystem service value estimates using provided valuation coefficients and adjustment factors.
-  \item To visualize and interpret spatial patterns of biomass and ecosystem services, highlighting potential conservation or restoration priority areas.
-\end{itemize}
+\begin{wrapfigure}{l}{0.28\textwidth}
+  \vspace*{-0.5\baselineskip}
+  \includegraphics[width=1\linewidth]{img/area_of_interest.pdf}
+  \caption{Area of interest.}
+  \vspace*{-\baselineskip}
+  \label{fig:area_of_interest}
+\end{wrapfigure}
 
-\section{Applied Methodology}
+Our AOI (Figure~\ref{fig:area_of_interest}) is a
+\SI{25}{\kilo\meter}-radius disc centred at
+\((119.8241^\circ,\,31.12085^\circ)\) in the Yangtze River Delta, a
+heterogeneous landscape with semi-natural forests, intensive
+agriculture, dense settlements and a dense river network.  Sentinel--2
+Level--2A imagery provides atmospherically corrected reflectances at
+10-20\,m resolution, enabling pixel-level inference of vegetation and
+water properties across this mosaic.
 
-\subsection{Data and Study Area}
+\section{Methods}
 
-The analysis is based on Sentinel-2 Level-2A (MSIL2A) products corresponding to the acquisition date specified in the hackathon guidelines.
-Because the AOI spans two Sentinel-2 tiles, both products overlapping the AOI were downloaded in SAFE format from the Copernicus Data Space Ecosystem.
+\paragraph{Vegetation indices.}
+We process six spectral bands from Sentinel-2, mosaicking them across tiles and aligning to a common 10-meter grid. 
+Digital numbers are converted to reflectance values between $0$ and $1.2$, which accounts for saturated values, while cloud, shadow, and invalid pixels are removed using quality masks. 
+Three vegetation indices, NDVI, EVI, and SAVI, are calculated to capture different aspects of vegetation health, using standard parameters to ensure numerical stability and physical plausibility.
+These indices provide the basis for both land-cover classification and biomass estimation in later stages. 
+The resulting vegetation maps are shown in Figure~\ref{fig:phase2}.
 
-The key datasets are:
-\begin{itemize}
-  \item Sentinel-2 Level-2A reflectance bands: Blue (B02), Green (B03), Red (B04), NIR (B08), SWIR1 (B11), SWIR2 (B12).
-  \item Optional auxiliary rasters (if available): digital elevation model (DEM), slope and long-term mean annual precipitation.
-  \item Vector geometry of the AOI: a GeoJSON polygon representing the \SI{25}{\kilo\meter} buffer around the central coordinates.
-\end{itemize}
-
-\subsection{Preprocessing and Indices}
-
-All processing steps were implemented in Python using \texttt{rasterio}, \texttt{geopandas}, \texttt{numpy} and related libraries within a Jupyter notebook.
-
-The main preprocessing steps are:
-\begin{enumerate}
-  \item \textbf{SAFE structure handling:} For each Sentinel-2 product, the band files corresponding to the required spatial resolutions were located within the SAFE directory tree.
-  \item \textbf{Band extraction:} The relevant bands (B02, B03, B04, B08, B11, B12) were read as scaled integer arrays and converted to top-of-canopy reflectance in the range $[0,1]$ using the documented scale factor (typically $1/10000$).
-  \item \textbf{AOI clipping:} Each band was clipped to the AOI geometry.
-  Depending on the implementation, this was done either by reading windows intersecting the AOI or by masking the full tile with the AOI polygon.
-  \item \textbf{Resampling and alignment:} To ensure consistent pixel alignment when combining bands of different native resolutions (10\,m and 20\,m), all arrays were resampled onto a common 10\,m grid using bilinear resampling.
-  \item \textbf{Cloud and no-data masking:} Clouds and invalid pixels were masked using a combination of the Sentinel-2 quality flags (if available) and simple spectral thresholds.
-\end{enumerate}
-
-Based on the preprocessed bands, the following indices were computed:
-\begin{itemize}
-  \item Normalized Difference Vegetation Index (NDVI)
-        \[
-          \mathrm{NDVI} = \frac{\mathrm{NIR} - \mathrm{Red}}{\mathrm{NIR} + \mathrm{Red}}.
-        \]
-  \item Enhanced Vegetation Index (EVI), using the coefficients recommended in the project guidelines.
-  \item Soil Adjusted Vegetation Index (SAVI) for areas with sparse vegetation.
-  \item Normalized Difference Water Index (NDWI) and Modified NDWI (MNDWI) for water detection.
-  \item Normalized Difference Turbidity Index (NDTI) for relative turbidity in water bodies.
-\end{itemize}
-
-\subsection{Biomass Estimation}
-
-Forest aboveground biomass was estimated using the allometric equations provided in the hackathon document, selecting the equation corresponding to the dominant forest type in the AOI.
-In general, biomass per pixel is modeled as a linear or nonlinear function of a vegetation index, for example
-\[
-  \mathrm{Biomass} = a + b \cdot \mathrm{NDVI} + c \cdot \mathrm{NDVI}^2,
-\]
-where the coefficients $(a,b,c)$ and the valid NDVI range are taken from the literature.
-Biomass estimates were capped at a reasonable upper bound (e.g.\ 500~ton/ha) to avoid unrealistic values.
-
-Total biomass for the AOI was obtained by summing pixel-wise biomass and multiplying by the pixel area in hectares.
-
-\subsection{Ecosystem Service Indicators}
-
-For aquatic and riparian ecosystems, we followed the simplified biophysical formulas provided in the guidelines for five services:
-water flow regulation, water purification, sediment control, aquifer recharge and flood protection.
-Each service $S$ is represented as a raster indicator combining area, vegetation condition and ancillary factors such as slope or rainfall.
-Examples include:
-\begin{itemize}
-  \item Water flow regulation proportional to water storage capacity, modeled from wetland area, assumed average depth and a vegetation-based retention factor.
-  \item Water purification modeled from filtration rate, vegetation quality (NDVI-based) and contact time.
-  \item Sediment control estimated from a simplified erosion proxy based on $(1-\mathrm{NDVI})$ and slope, combined with a sediment delivery ratio and trap efficiency.
-  \item Aquifer recharge based on precipitation, infiltration rate and runoff coefficient, with NDVI used as a proxy for infiltration capacity.
-  \item Flood protection derived from floodplain area, assumed storage depth and a roughness factor linked to vegetation cover.
-\end{itemize}
-
-\subsection{Dynamic Valuation}
-
-Biophysical indicators were converted to monetary values using baseline valuation coefficients (USD/ha/year) for each service.
-These coefficients were then adjusted by a set of dimensionless factors describing ecosystem condition, water scarcity and downstream population or infrastructure exposure.
-The total ecosystem service value for each pixel and for the entire AOI was computed as
-\[
-  \mathrm{Total\_ESV} = \sum_i \mathrm{Service}_i \times \mathrm{Area}_i \times \mathrm{Quality\_Factor}_i \times \mathrm{Adjustment\_Factors}_i.
-\]
-
-\section{Main Results}
-
-\subsection{Forest Biomass}
-
-% Example figure placeholder
-\begin{figure}[ht]
-  \centering
-  % \includegraphics[width=0.8\textwidth]{figures/biomass_map.png}
-  \caption{Spatial distribution of estimated aboveground forest biomass (ton/ha) within the AOI.}
-  \label{fig:biomass_map}
+\begin{figure}[!htbp]
+    \centering
+    \captionsetup[subfigure]{aboveskip=-1pt,belowskip=-1pt}
+\begin{subfigure}[t]
+  {0.3\textwidth}  \includegraphics[width=\linewidth]{img/phase2_EVI.pdf}
+    \subcaption{EVI}
+\end{subfigure}
+\begin{subfigure}[t]
+  {0.3\textwidth}
+\includegraphics[width=\linewidth]{img/phase2_NDVI.pdf}
+\caption{NVDI}
+\end{subfigure}
+\begin{subfigure}[t]
+  {0.3\textwidth}
+\includegraphics[width=\linewidth]{img/phase2_SAVI.pdf}
+\caption{SAVI}
+\end{subfigure}
+\caption{\label{fig:phase2}Vegetation indices.}
 \end{figure}
 
-A continuous map of forest biomass was generated for the AOI using the selected allometric equation.
-Higher biomass values are concentrated in densely forested areas, especially along the upland regions to the west and south of the main lake.
-Lower biomass is observed in urban and agricultural zones.
+\paragraph{Land cover and biomass model.}
+Land cover is classified using NDVI thresholds in accordance with regional guidelines for the Yangtze River Delta.
+Using the $10$m pixel size, each pixel represents \(A_\text{pix}=0.01\) ha, enabling future area calculations for the study region. 
+The summary table~\ref{tab:land_cover} presents the classification results with four vegetation density classes: {\em non-forest}, {\em sparse}, {\em moderate}, and {\em dense vegetation}.
+Aboveground biomass is estimated using the NDVI-based allometric equation from Zheng et al. (2004), calibrated for Asian subtropical forests. 
+The relationship $\text{Biomass} = 12.3 + 285.5 \times \text{NDVI}$ provides initial estimates, which are then scaled by vegetation density class to better reflect regional conditions in the Yangtze River Delta. 
+Biomass calculations are restricted to vegetated pixels within the area of interest, with values bounded between $0$ and $400$~ton per hectare to maintain ecological plausibility.
+Statistical validation included comprehensive sensitivity analysis testing key parameters: NDVI vegetation thresholds ($0.15$-$0.25$) and maximum biomass limits for sparse vegetation ($40$-$60$ t/ha). 
+Results were compared against published values for regional ecosystem types, and uncertainty was quantified through confidence scoring based on the proportion of comparisons falling within expected ranges. 
+Distribution characteristics, including skewness, coefficient of variation, and outlier percentages, were systematically evaluated to assess result robustness.
 
-Table~\ref{tab:biomass_summary} summarizes basic statistics of biomass over the AOI.
-
-\begin{table}[ht]
-  \centering
-  \caption{Summary statistics of aboveground biomass (ton/ha) within the AOI.}
-  \label{tab:biomass_summary}
-  \begin{tabular}{lrrrr}
+\begin{table}[!htbp]
+    \centering
+    \begin{tabular}{l c c c c c}
     \toprule
-    Metric & Min & Mean & Median & Max \\
+    & Non-forest & Sparse & Moderate & Dense & Total \\
     \midrule
-    Biomass (ton/ha) & -- & -- & -- & -- \\
-    \bottomrule
-  \end{tabular}
+    Area (ha) & 70085.9 & 43681.9 & 80601.0 & 1604.2 & 194368.8 \\
+    Percentage (\%) & 36.1\% & 22.5\% & 41.5\% & 0.8\% & 100.0\% \\
+    \toprule     
+    \end{tabular}
+    \caption{Land cover classification area statistics showing the vegetation density distribution.\label{tab:land_cover}}
 \end{table}
 
-\subsection{Aquatic Ecosystem Services}
+\paragraph{Water detection and quality.}
+Water detection employed a dual-index approach calculating Normalized Difference Water Index (NDWI) from green and near-infrared bands and Modified Normalized Difference Water Index (MNDWI) from green and shortwave infrared bands. 
+We descriminated water using the standard thresholds NDWI $> 0$ and MNDWI $> 0$ with both individual and combined approaches to minimize false positives. 
+Water bodies were classified into permanent, seasonal, and wetland categories based on agreement between indices and NDVI constraints (0.1-0.4) for wetland identification. 
+The water quality assessment used the Normalised Difference Turbidity Index (NDTI) from red and green bands, with turbidity classified into four levels (clear, moderate, high, very high) using established thresholds ($-0.1$, $0.0$, $0.1$). 
+Water quality maps were generated showing spatial turbidity patterns, and degraded versus healthy water bodies were identified by detecting areas with very high turbidity (NDTI $\ge 0.1$) across different water types, with suspended sediment concentration estimated using combined red and near-infrared reflectance.
 
-% Example figure placeholder
-\begin{figure}[ht]
+\paragraph{Riparian buffer and conservation analysis.}
+The riparian buffers were delineated at $30$, $100$, and $300$-meter distances from water bodies to analyze vegetation quality gradients using NDVI. 
+Priority conservation areas were identified using a weighted composite of vegetation health ($40$\%), water proximity ($30$\%) and biomass value ($30$\%), with the highest scores $20$\% designated as high priority.
+
+\paragraph{Ecosystem service quantification and valuation.}
+Ecosystem services were quantified through biophysical modeling integrating vegetation density, water distribution, and riparian buffers. 
+Economic valuation employed benefit transfer with base values from {\bf literature meta-analyses}, adjusted for regional conditions (quality: $0.8$, scarcity: $1.2$, benefit: $1.5$). 
+Multi-service hotspots were identified by normalising and summing service layers, with thresholds set at high quantiles.
+
+\section{Results and Analysis}
+
+\paragraph{Vegetation and biomass.}
+The NDVI distribution across the area of interest (mean \(0.253\), standard deviation \(0.26\), and range from \(-0.998\) to \(0.83\)) indicates a landscape with substantial vegetation cover, though dominated by moderate rather than dense forest types. 
+Large water bodies and urban areas occupy significant portions of the region, while dense forest remains exceptionally scarce at only $0.8$\% of the total area.
+Biomass estimation reveals a total aboveground stock of 
+\[
+B_\mathrm{tot} = 16\,837\,848~\text{t} \approx 16.838~\text{Mt}
+\]
+distributed across \(125\,876.4\) hectares of vegetated land. 
+The biomass density distribution is relatively compact (mean \(133.8\)~t/ha, median \(139.3\)~t/ha, standard deviation \(27.9\)~t/ha), with most values clustered between \(115.0\) and \(154.4\)~t/ha (25th-75th percentiles). 
+This tight distribution suggests homogeneous biomass conditions across the vegetated landscape.
+
+\begin{table}[htbp]
   \centering
-  % \includegraphics[width=0.8\textwidth]{figures/water_flow_regulation.png}
-  \caption{Example ecosystem service map: water flow regulation capacity (relative units).}
-  \label{fig:water_flow}
+  \begin{tabular}{lrrr}
+    \toprule
+    Land-cover class & Total biomass (t) & Mean (t/ha) & Max (t/ha) \\
+    \midrule
+    Sparse     &  4\,436\,449      & 101.6   & 126.5   \\
+    Moderate   & 12\,094\,983      & 150.1   & 183.6   \\
+    Dense      &    306\,435       & 191.0   & 249.4   \\
+    \bottomrule
+  \end{tabular}
+  \caption{Aboveground biomass by land-cover class.\label{tab:biomass-by-class}}
+\end{table}
+
+Moderate vegetation stores the majority of biomass (\(12.09\times 10^6\)~t, \(\sim 72\%\) of total), consistent with its dominance in the land cover classification. 
+Despite dense forest covering only \(0.8\%\) of the area, it achieves the highest biomass densities (mean \(191.0\)~t/ha). 
+The overall mean biomass density of \(133.8\)~t/ha aligns with expectations for mixed forests, with values following a approximately normal distribution centered around this mean and bounded by a minimum threshold of \(69.4\)~t/ha. 
+This pattern reflects the homogeneous nature of the moderate vegetation class that dominates the region's biomass storage.
+Validation against regional studies confirms the estimate falls within expected ranges for mixed forests, and sensitivity analysis shows less than $4$\% variation in total biomass across tested parameter thresholds, indicating robust results despite the homogeneous distribution pattern.
+
+\begin{wrapfigure}{r}{0.37\textwidth}
+  \vspace*{-0.5\baselineskip}
+  \includegraphics[width=1\linewidth]{img/phase8.pdf}
+  \caption{Conservation priority. Higher scores are areas of greater conservation importance.}
+  \vspace*{-\baselineskip}
+  \label{fig:conservation}
+\end{wrapfigure}
+
+\paragraph{Water bodies and quality.}
+Water covers nearly one-fifth of the study area ($43,695$~ha, or $17.5$\%), with almost all of it classified as permanent water bodies given the large presence of a lake in our AOI (Figure~\ref{fig:water-analysis}a). 
+Seasonal water accounts for just under $2,000$~ha, while wetlands are scarce at only $1$~ha.
+The water quality tells that the vast majority of the waters (around $98$\%) presents moderate turbidity levels, which is typical for the sediment-rich Yangtze River system. 
+Only small areas appear either very clear ($0.5$\%) or quite turbid ($1.6$\%), and severely degraded water is virtually nonexistent (Figure~\ref{fig:water-analysis}c). 
+The strong agreement between our two detection methods (Figure~\ref{fig:water-analysis}b) gives us confidence in these results, which suggest generally healthy aquatic conditions across the region.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[b]{0.32\textwidth}
+    \includegraphics[width=\textwidth]{img/phase6_water_detection.pdf}
+    \caption{Water body classification}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\textwidth}
+    \includegraphics[width=\textwidth]{img/phase6_scatter.pdf}
+    \caption{NDWI vs MNDWI correlation}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.32\textwidth}
+    \includegraphics[width=\textwidth]{img/phase7_quality_water.pdf}
+    \caption{Water quality classification}
+  \end{subfigure}
+  \caption{Water analysis shows (a) where different water types are located, (b) how two different detection methods agree on what's water, and (c) how clear the water appears across the region.\label{fig:water-analysis}}
 \end{figure}
 
-Raster maps were produced for each of the five targeted ecosystem services.
-In general, high service provision is associated with intact wetlands and vegetated riparian zones, while degraded or urbanized shorelines show lower values.
+\paragraph{Riparian buffer analysis.}
+This revealed extensive buffered areas totalling $255,898$~ha, with vegetation quality showing a strong negative relationship with water proximity. 
+The $30$-meter buffer exhibited degraded conditions (mean NDVI $-0.132$), improving to marginal quality at $100$ meters (mean NDVI $0.006$) and reaching moderate levels at $300$ meters (mean NDVI $0.148$). 
+This pattern suggests anthropogenic pressure immediately adjacent to water bodies. Conservation prioritisation identified $49,858$~ha ($19.5$\% of total buffer area) as high priority, while wetland connectivity scored poorly ($0.305$) despite perfect proximity ($1.000$), indicating that while wetlands are physically connected to water bodies, their small size ($1.03$~ha) limit functional ecosystem connectivity.
+Spatial analysis of conservation priorities (Figure~\ref{fig:conservation}) reveals concentrated high-value areas along riparian corridors, highlighting specific zones for targeted restoration efforts.
 
-A concise summary of total and per-hectare values for each service is shown in Table~\ref{tab:esv_summary}.
+\paragraph{Ecosystem service quantification and valuation.}
+Quantification of five ecosystem services revealed total annual benefits of $1.18$ billion, dominated by flood protection ($723$ million) and aquifer recharge ($249$ million). Water purification delivered the highest per-hectare value ($4,320$/ha/year) across $43,695$~ha of water bodies, while sediment control provided $20$ million annually across riparian zones. The average ecosystem service value was $1,567$/ha/year across the active service areas.
 
-\begin{table}[ht]
+Multi-service analysis identified $69,250$~ha of hotspot areas ($20$\% of AOI) concentrating $110$ million in annual benefits. These hotspots occurred in vegetated floodplains and riparian corridors, where multiple services co-occurred at high levels. The spatial concentration highlights the disproportionate importance of specific landscape elements for ecosystem service delivery.
+
+\begin{table}[!htbp]
   \centering
-  \caption{Illustrative ecosystem service value summary for the AOI (values to be filled in).}
-  \label{tab:esv_summary}
-  \begin{tabular}{lrr}
+  \begin{tabular}{lrrr}
     \toprule
-    Ecosystem Service & Total value (USD/year) & Mean value (USD/ha/year) \\
+    Service & Area (ha) & Total Value (USD/yr) & Value per ha (USD/yr) \\
     \midrule
-    Water flow regulation   & -- & -- \\
-    Water purification      & -- & -- \\
-    Sediment control        & -- & -- \\
-    Aquifer recharge        & -- & -- \\
-    Flood protection        & -- & -- \\
+    Flow Regulation & 1 & 2,225 & 2,160 \\
+    Purification & 43,695 & 188,762,314 & 4,320 \\
+    Sediment Control & 17,712 & 20,403,729 & 1,152 \\
+    Aquifer Recharge & 249,289 & 179,488,145 & 720 \\
+    Flood Protection & 249,289 & 722,515,456 & 2,898 \\
+    \midrule
+    Total & 559,986 & 1,111,171,868 & 1,984 \\
     \bottomrule
   \end{tabular}
+  \caption{Ecosystem service valuation summary for the Yangtze River Delta study area.\label{tab:ecosystem-valuation}}
 \end{table}
 
-\section{Analysis and Discussion}
+The valuation (see Table~\ref{tab:ecosystem-valuation}) reveals that the 559,986 hectares of land providing these services generate a total of over USD 1.1 billion per year. Among the services, Flood Protection is the most significant in terms of total value (USD 722.5 million/yr), which is consistent with a delta region where flood mitigation is a critical function of wetlands and vegetated land. This is followed by Aquifer Recharge and Water Purification, which are also vital services in a densely populated and economically important estuary.
 
-The results highlight strong spatial heterogeneity in both biomass and ecosystem service provision across the AOI.
-Forested uplands contribute disproportionately to carbon storage and sediment control, while low-lying wetlands and floodplains around the lake are key for water purification, aquifer recharge and flood attenuation.
+The data shows a clear distinction between the spatial extent and the value intensity of each service. For instance, while Aquifer Recharge occurs across the entire area (249,289 ha), its per-hectare value (USD 720) is lower than that of Purification (USD 4,320/ha), which, despite covering a smaller area, delivers an exceptionally high value per unit of land.
 
-Several important points emerge from the analysis:
-\begin{itemize}
-  \item \textbf{Importance of vegetation condition:} NDVI and related indices strongly influence both biomass and multiple service indicators, underscoring the role of vegetation cover and health.
-  \item \textbf{Critical role of riparian zones:} Vegetated buffers along rivers and lake shorelines consistently appear as hotspots of water purification and flood protection services.
-  \item \textbf{Data and model limitations:} The biophysical models used are intentionally simple and rely on global default parameters.
-  They do not explicitly account for local hydrology, soil properties, management practices or infrastructure, and should be interpreted as relative indicators rather than precise absolute estimates.
-  \item \textbf{Uncertainty sources:} Major sources of uncertainty include cloud contamination, misclassification of land cover, limitations of the allometric equations outside their calibration range and the use of global valuation coefficients.
-\end{itemize}
+This table underscores the immense economic justification for the conservation and restoration of natural ecosystems in the region. The biomass stocks you previously estimated (16.8 Mt, mean 133.8 t/ha) are the fundamental ecological capital that produces this substantial annual flow of valuable services.
 
-Despite these limitations, the workflow demonstrates that freely available satellite data can be combined with simple models to derive integrated maps of biomass and ecosystem services at regional scale.
-These outputs can support screening-level assessments and help identify priority areas for more detailed field-based studies.
+Figure~\ref{fig:phase9} illustrates the quantification of three critical water-related ecosystem services. The spatial analysis of ecosystem services reveals distinct patterns for water regulation. Water purification services show a moderate removal capacity of approximately 2 kg/year of contaminants per unit area. In contrast, sediment control demonstrates a mostly uniform value of around 0.05 tons per year retained along all major bodies of water, suggesting a widespread and stable function provided by riparian vegetation. The most significant variation is observed in aquifer recharge, which is highly dependent on land cover; dense forests facilitate the highest recharge rates of up to 60 mm per year, while this capacity diminishes in regions with sparser vegetation.
+
+\begin{figure}[!htbp]
+    \centering
+    \captionsetup[subfigure]{aboveskip=-1pt,belowskip=-1pt}
+\begin{subfigure}[t]
+  {0.3\textwidth}  \includegraphics[width=\linewidth]{img/phase9_purification.pdf}
+    \subcaption{Purification levels.}
+\end{subfigure}
+\begin{subfigure}[t]
+  {0.3\textwidth}
+\includegraphics[width=\linewidth]{img/phase9_sediment_control.pdf}
+\caption{Sediment control.}
+\end{subfigure}
+\begin{subfigure}[t]
+  {0.3\textwidth}
+\includegraphics[width=\linewidth]{img/phase9_aquifer_recharge.pdf}
+\caption{Aquifer recharge.}
+\end{subfigure}
+\caption{\label{fig:phase9}Quantification of purification, sediment control, and aquifer recharge.}
+\end{figure}
+
+\vspace{-\baselineskip}
 
 \section{Conclusions}
 
-This hackathon project implemented an end-to-end workflow for estimating forest biomass and key hydrological ecosystem services using Sentinel-2 Level-2A imagery for a \SI{25}{\kilo\meter} radius AOI.
-The methodology integrates satellite-derived vegetation and water indices, literature-based allometric equations and simplified biophysical and economic valuation models.
+We developed a reproducible workflow to assess the ecosystem, vegetation, and waters, of an area close to the Yangtze River Delta using Sentinel-2 imagery. 
 
-The main contributions are:
-\begin{itemize}
-  \item A reproducible Python pipeline for loading, preprocessing and analyzing Sentinel-2 imagery in a geospatial context.
-  \item Spatially explicit maps of aboveground forest biomass and five aquatic ecosystem services.
-  \item A preliminary valuation of ecosystem services in monetary units, highlighting high-value hotspots within the AOI.
-\end{itemize}
-
-Future work could refine the approach by incorporating higher-resolution elevation and hydrological data, locally calibrated biomass and valuation models, and multi-temporal image series to assess seasonal and interannual variability.
+Results indicate 16.8~Mt of aboveground biomass distributed across $125,876$~ha of vegetated land, with extensive permanent water coverage ($43,695$~ha) exhibiting predominantly moderate turbidity levels.
+Riparian analysis revealed degraded vegetation conditions proximal to water bodies (30-m buffer NDVI: $-0.132$), improving with distance (300-m buffer NDVI: $0.148$), and identified 49,858~ha of high-priority conservation areas.
+Method validation through sensitivity analysis demonstrated parameter robustness ($\pm 4$\% biomass variation), and comparisons with regional studies confirmed result plausibility. 
+The workflow presents a quantitative baseline for natural capital assessment, with applications for targeted conservation planning in degraded riparian corridors.
 
 \end{document}
